@@ -151,9 +151,7 @@
             
             /* Core Autofit Ruleset */
             white-space: nowrap;        /* Never wrap cell context onto multiple lines */
-            max-width: 400px;           /* Puts a sane upper limit on excessively huge rows */
-            overflow: hidden;
-            text-overflow: ellipsis;    /* Safely add '...' if cell breaks over max-width limits */
+            width: 1%;            /* Cooperates with max-content to wrap tight */
         }
         
         tr:last-child td { border-bottom: none; }
