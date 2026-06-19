@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Obsidian-style CSV Workspace (Offline Pure CSS)</title>
+    <title>Obsidian-style CSV Workspace (Auto-Fit Columns)</title>
     
     <script src="papaparse.min.js"></script>
 
@@ -20,7 +20,6 @@
         }
         header {
             background-color: #030712;
-            border-b: 1px solid #374151;
             padding: 12px 24px;
             display: flex;
             justify-content: space-between;
@@ -43,7 +42,6 @@
         aside {
             width: 250px;
             background-color: #030712;
-            border-r: 1px solid #374151;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -94,7 +92,9 @@
             width: 250px;
         }
         #tableSearch:focus { outline: none; border-color: #a855f7; }
-        #viewPane { flex: 1; overflow: auto; padding: 24px; }
+        
+        /* SCROLLABLE VIEW PANE AREA */
+        #viewPane { flex: 1; overflow: auto; padding: 24px; position: relative; }
         #welcomeScreen {
             height: 100%;
             display: flex;
@@ -108,15 +108,24 @@
         }
         #welcomeScreen.hidden { display: none; }
         
-        /* SOLID BLACK BORDERED DATAGRID STYLING */
+        /* ADVANCED AUTO-FIT SOLID BLACK BORDERED DATAGRID */
         #tableWrapper {
             background-color: #030712;
             border-radius: 6px;
-            overflow: auto;
-            border: 2px solid #000000; /* Robust Outermost Black Border */
+            border: 2px solid #000000;
+            display: inline-block; /* Forces wrapper to wrap tight around the expanding content auto widths */
+            min-w: 100%;
         }
         #tableWrapper.hidden { display: none; }
-        table { width: 100%; border-collapse: collapse; text-align: left; }
+        
+        table { 
+            border-collapse: collapse; 
+            text-align: left;
+            table-layout: auto; /* Browser automatically figures out column sizing per cell lengths */
+            width: max-content; /* Prevents cell wrapping by expanding horizontally */
+            min-width: 100%;
+        }
+        
         th {
             background-color: #1f2937;
             color: #e5e7eb;
@@ -124,19 +133,29 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 12px 24px;
+            padding: 10px 16px;
             position: sticky;
             top: 0;
-            border-bottom: 2px solid #000000; /* Black separating header */
-            border-right: 1px solid #000000;  /* Black column divider */
+            border-bottom: 2px solid #000000;
+            border-right: 1px solid #000000;
+            white-space: nowrap; /* Forces layout tracking onto single string layers */
+            z-index: 1;
         }
+        
         td {
-            padding: 12px 24px;
+            padding: 8px 16px;
             font-size: 0.875rem;
             color: #d1d5db;
-            border-bottom: 1px solid #000000; /* Black row lines */
-            border-right: 1px solid #000000;  /* Black column lines */
+            border-bottom: 1px solid #000000;
+            border-right: 1px solid #000000;
+            
+            /* Core Autofit Ruleset */
+            white-space: nowrap;        /* Never wrap cell context onto multiple lines */
+            max-width: 400px;           /* Puts a sane upper limit on excessively huge rows */
+            overflow: hidden;
+            text-overflow: ellipsis;    /* Safely add '...' if cell breaks over max-width limits */
         }
+        
         tr:last-child td { border-bottom: none; }
         tr td:last-child, tr th:last-child { border-right: none; }
         tr:hover td { background-color: #111827; }
@@ -300,7 +319,7 @@
                 let rowHTML = '';
                 headers.forEach(header => {
                     const value = row[header] !== undefined ? row[header] : '';
-                    rowHTML += `<td>${value}</td>`;
+                    rowHTML += `<td title="${value.replace(/"/g, '&quot;')}">${value}</td>`;
                 });
                 
                 rowElement.innerHTML = rowHTML;
