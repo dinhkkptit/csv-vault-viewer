@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsidian-style CSV Workspace (Offline Pure CSS)</title>
+    
+    <script src="papaparse.min.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #111827;
+            color: #f3f4f6;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        header {
+            background-color: #030712;
+            border-b: 1px solid #374151;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #374151;
+        }
+        .logo { font-weight: bold; font-size: 1.125rem; letter-spacing: 0.05em; color: #a855f7; }
+        .picker-btn {
+            background-color: #9333ea;
+            color: white;
+            font-weight: 600;
+            font-size: 0.75rem;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .picker-btn:hover { background-color: #7e22ce; }
+        .workspace { display: flex; flex: 1; overflow: hidden; }
+        aside {
+            width: 250px;
+            background-color: #030712;
+            border-r: 1px solid #374151;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border-right: 1px solid #374151;
+        }
+        .sidebar-content { padding: 16px; flex: 1; overflow-y: auto; }
+        .sidebar-title { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+        #fileList { list-style: none; }
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            color: #9ca3af;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .file-item:hover { background-color: #1f2937; color: #f9fafb; }
+        .file-item.active {
+            background-color: rgba(147, 51, 234, 0.2);
+            color: #d8b4fe;
+            border-left: 3px solid #a855f7;
+            border-radius: 0 4px 4px 0;
+        }
+        main { flex: 1; display: flex; flex-direction: column; background-color: #111827; overflow: hidden; }
+        #metaPanel {
+            background-color: #111827;
+            border-bottom: 1px solid #374151;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #metaPanel.hidden { display: none; }
+        .stats { font-size: 0.75rem; color: #9ca3af; margin-top: 2px; }
+        #tableSearch {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            color: #e5e7eb;
+            font-size: 0.875rem;
+            padding: 6px 12px;
+            border-radius: 4px;
+            width: 250px;
+        }
+        #tableSearch:focus { outline: none; border-color: #a855f7; }
+        #viewPane { flex: 1; overflow: auto; padding: 24px; }
+        #welcomeScreen {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            max-width: 400px;
+            margin: 0 auto;
+            color: #9ca3af;
+        }
+        #welcomeScreen.hidden { display: none; }
+        
+        /* SOLID BLACK BORDERED DATAGRID STYLING */
+        #tableWrapper {
+            background-color: #030712;
+            border-radius: 6px;
+            overflow: auto;
+            border: 2px solid #000000; /* Robust Outermost Black Border */
+        }
+        #tableWrapper.hidden { display: none; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th {
+            background-color: #1f2937;
+            color: #e5e7eb;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 12px 24px;
+            position: sticky;
+            top: 0;
+            border-bottom: 2px solid #000000; /* Black separating header */
+            border-right: 1px solid #000000;  /* Black column divider */
+        }
+        td {
+            padding: 12px 24px;
+            font-size: 0.875rem;
+            color: #d1d5db;
+            border-bottom: 1px solid #000000; /* Black row lines */
+            border-right: 1px solid #000000;  /* Black column lines */
+        }
+        tr:last-child td { border-bottom: none; }
+        tr td:last-child, tr th:last-child { border-right: none; }
+        tr:hover td { background-color: #111827; }
+        .hidden-row { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span class="logo">🪨 OBSIDIAN</span>
+            <span style="color: #4b5563;">/</span>
+            <span style="font-size: 0.875rem; font-weight: 500; color: #d1d5db;">CSV Workspace</span>
+        </div>
+        <div>
+            <label class="picker-btn">
+                📂 Open CSV Files...
+                <input type="file" id="csvPicker" accept=".csv" multiple style="display: none;">
+            </label>
+        </div>
+    </header>
+
+    <div class="workspace">
+        
+        <aside>
+            <div class="sidebar-content">
+                <div class="sidebar-title">Loaded Vault Files</div>
+                <ul id="fileList">
+                    <li id="emptyState" style="font-size: 0.875rem; color: #4b5563; font-style: italic; padding: 4px 8px;">
+                        No files imported yet.
+                    </li>
+                </ul>
+            </div>
+            <div style="padding: 12px; border-top: 1px solid #374151; background-color: rgba(17,24,39,0.5); font-size: 0.7rem; color: #4b5563; text-align: center;">
+                100% Offline Secured
+            </div>
+        </aside>
+
+        <main>
+            <div id="metaPanel" class="hidden">
+                <div>
+                    <h2 id="activeFileName" style="font-size: 1.125rem; font-weight: 700; color: white;">Select a file</h2>
+                    <p id="activeFileStats" class="stats">Rows: 0 | Columns: 0</p>
+                </div>
+                <div>
+                    <input type="text" id="tableSearch" placeholder="Search rows...">
+                </div>
+            </div>
+
+            <div id="viewPane">
+                <div id="welcomeScreen">
+                    <div style="font-size: 3rem; margin-bottom: 16px;">📊</div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; color: #d1d5db;">Your Workspace is Empty</h3>
+                    <p style="font-size: 0.875rem; color: #6b7280; margin-top: 8px;">Import multiple data sheets from your local directories to flip between tables instantly.</p>
+                </div>
+
+                <div id="tableWrapper" class="hidden">
+                    <table id="mainTable">
+                        <thead id="tableHead"></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const vault = {};
+        let activeFileId = null;
+
+        const csvPicker = document.getElementById('csvPicker');
+        const fileList = document.getElementById('fileList');
+        const emptyState = document.getElementById('emptyState');
+        const metaPanel = document.getElementById('metaPanel');
+        const activeFileName = document.getElementById('activeFileName');
+        const activeFileStats = document.getElementById('activeFileStats');
+        const tableSearch = document.getElementById('tableSearch');
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const tableWrapper = document.getElementById('tableWrapper');
+        const tableHead = document.getElementById('tableHead');
+        const tableBody = document.getElementById('tableBody');
+
+        csvPicker.addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (!files.length) return;
+
+            if (emptyState) emptyState.remove();
+
+            Array.from(files).forEach(file => {
+                const fileId = 'file-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    Papa.parse(event.target.result, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            vault[fileId] = {
+                                name: file.name,
+                                data: results.data,
+                                fields: results.meta.fields || []
+                            };
+                            addSidebarItem(fileId, file.name);
+                            switchToFile(fileId);
+                        }
+                    });
+                };
+                reader.readAsText(file);
+            });
+        });
+
+        function addSidebarItem(id, filename) {
+            const li = document.createElement('li');
+            li.id = 'node-' + id;
+            li.className = "file-item";
+            li.innerHTML = `<span>📄</span> <span style="overflow:hidden; text-overflow:ellipsis;">${filename}</span>`;
+            li.addEventListener('click', () => switchToFile(id));
+            fileList.appendChild(li);
+        }
+
+        function switchToFile(id) {
+            if (activeFileId) {
+                const oldNode = document.getElementById('node-' + activeFileId);
+                if (oldNode) oldNode.classList.remove('active');
+            }
+
+            activeFileId = id;
+            const currentFile = vault[id];
+
+            const activeNode = document.getElementById('node-' + id);
+            if (activeNode) activeNode.classList.add('active');
+
+            welcomeScreen.classList.add('hidden');
+            metaPanel.classList.remove('hidden');
+            tableWrapper.classList.remove('hidden');
+            tableSearch.value = '';
+
+            activeFileName.textContent = currentFile.name;
+            activeFileStats.textContent = `Rows: ${currentFile.data.length} | Columns: ${currentFile.fields.length}`;
+
+            renderTableContent(currentFile.fields, currentFile.data);
+        }
+
+        function renderTableContent(headers, dataset) {
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            if (headers.length === 0) return;
+
+            let headerHTML = '<tr>';
+            headers.forEach(header => {
+                headerHTML += `<th>${header}</th>`;
+            });
+            headerHTML += '</tr>';
+            tableHead.innerHTML = headerHTML;
+
+            dataset.forEach((row) => {
+                const rowElement = document.createElement('tr');
+                rowElement.className = "data-row";
+                
+                let rowHTML = '';
+                headers.forEach(header => {
+                    const value = row[header] !== undefined ? row[header] : '';
+                    rowHTML += `<td>${value}</td>`;
+                });
+                
+                rowElement.innerHTML = rowHTML;
+                tableBody.appendChild(rowElement);
+            });
+        }
+
+        tableSearch.addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase();
+            const rows = tableBody.getElementsByClassName('data-row');
+            const currentFile = vault[activeFileId];
+            
+            if (!currentFile) return;
+
+            Array.from(rows).forEach((rowElement, index) => {
+                const rowData = currentFile.data[index];
+                const rowTextString = Object.values(rowData).join(' ').toLowerCase();
+                
+                if (rowTextString.includes(query)) {
+                    rowElement.classList.remove('hidden-row');
+                } else {
+                    rowElement.classList.add('hidden-row');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
